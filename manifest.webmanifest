@@ -1,0 +1,19 @@
+{
+  "name": "レジメン副作用チェック",
+  "short_name": "副作用チェック",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4ece4",
+  "theme_color": "#a63c2f",
+  "lang": "ja",
+  "description": "血液内科レジメンの副作用評価をオフラインで行うスマホ向けWebアプリ",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
