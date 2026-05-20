@@ -1,4 +1,4 @@
-const CACHE_NAME = "regimen-ae-app-v2";
+const CACHE_NAME = "regimen-ae-app-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
