@@ -951,11 +951,14 @@ const state = {
   labRefHigh: {},
 };
 
+let offlineCacheReady = false;
+
 const elements = {
   regimenSelect: document.querySelector("#regimen-select"),
   diseaseInput: document.querySelector("#disease-input"),
   cycleInput: document.querySelector("#cycle-input"),
   dayInput: document.querySelector("#day-input"),
+  offlineStatus: document.querySelector("#offline-status"),
   contextSummary: document.querySelector("#context-summary"),
   timingHint: document.querySelector("#timing-hint"),
   adverseSections: document.querySelector("#adverse-sections"),
@@ -985,6 +988,13 @@ function hydrateState() {
 
 function persistState() {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
+}
+
+function setOfflineStatus(message, tone = "neutral") {
+  if (!elements.offlineStatus) return;
+  const connection = navigator.onLine ? "現在オンラインです。" : "現在オフラインです。";
+  elements.offlineStatus.textContent = `${message} ${connection}`;
+  elements.offlineStatus.dataset.tone = tone;
 }
 
 function bindEvents() {
@@ -1335,11 +1345,70 @@ function renderSummary() {
 }
 
 function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+  const handleOnline = () => {
+    if (offlineCacheReady) {
+      setOfflineStatus("この端末に保存済みです。オンライン中は最新ファイルを確認できます。", "ready");
+      return;
+    }
+    setOfflineStatus("この端末に保存する準備をしています。初回はオンラインで最後まで表示してください。");
+  };
+
+  const handleOffline = () => {
+    if (offlineCacheReady) {
+      setOfflineStatus("通信がないためキャッシュ済みの内容で動作します。", "ready");
+      return;
+    }
+    setOfflineStatus("まだ保存準備が完了していないため、初回はオンラインで開いてください。", "warn");
+  };
+
+  if (!("serviceWorker" in navigator)) {
+    setOfflineStatus("このブラウザはオフライン保存に対応していません。", "warn");
+    return;
+  }
+
+  if (window.location.protocol === "file:") {
+    setOfflineStatus(
+      "ファイルを直接開いているためオフライン保存は有効になりません。Safari/ChromeでURLとして開いてください。",
+      "warn",
+    );
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    setOfflineStatus("オフライン保存には https または localhost での表示が必要です。", "warn");
+    return;
+  }
+
+  window.addEventListener("online", () => {
+    handleOnline();
+  });
+  window.addEventListener("offline", () => {
+    handleOffline();
+  });
+
+  offlineCacheReady = Boolean(navigator.serviceWorker.controller);
+  if (navigator.onLine) {
+    handleOnline();
+  } else {
+    handleOffline();
+  }
+
+  window.addEventListener("load", async () => {
+    try {
+      await navigator.serviceWorker.register("./service-worker.js");
+      await navigator.serviceWorker.ready;
+      offlineCacheReady = true;
+      setOfflineStatus(
+        "この端末に保存できるよう準備しました。初回表示後はオフラインでも使えます。",
+        "ready",
+      );
+    } catch (error) {
       console.warn("service worker registration failed", error);
-    });
+      setOfflineStatus(
+        "オフライン保存の準備に失敗しました。最初はオンラインで開き、URLやブラウザ設定を確認してください。",
+        "danger",
+      );
+    }
   });
 }
 

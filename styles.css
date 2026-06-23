@@ -111,6 +111,34 @@ input[type="number"] {
   color: var(--muted);
 }
 
+.offline-status {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(87, 50, 31, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.offline-status[data-tone="ready"] {
+  border-color: rgba(62, 111, 82, 0.2);
+  background: rgba(237, 247, 240, 0.92);
+  color: var(--ok);
+}
+
+.offline-status[data-tone="warn"] {
+  border-color: rgba(198, 91, 25, 0.2);
+  background: rgba(255, 244, 232, 0.92);
+  color: var(--warn);
+}
+
+.offline-status[data-tone="danger"] {
+  border-color: rgba(143, 31, 31, 0.24);
+  background: rgba(255, 239, 239, 0.92);
+  color: var(--danger);
+}
+
 .hero-badges {
   display: flex;
   flex-wrap: wrap;
