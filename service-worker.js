@@ -1,85 +1,93 @@
-const CACHE_NAME = "regimen-ae-app-v4";
-const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icon.svg",
-  "./service-worker.js",
-];
+const CACHE_NAME = "regimen-ae-app-v8";
+const APP_SHELL_PATHS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
+const APP_SHELL_URLS = APP_SHELL_PATHS.map((path) => new URL(path, self.registration.scope).toString());
+const APP_SHELL_URL_SET = new Set(APP_SHELL_URLS);
+const OFFLINE_DOCUMENT_URL = new URL("./index.html", self.registration.scope).toString();
 
-function isAppShellRequest(requestUrl) {
-  const url = new URL(requestUrl);
-  const scopeUrl = new URL(self.registration.scope);
+function isCacheableResponse(response) {
+  return Boolean(response && response.status === 200 && response.type === "basic");
+}
 
-  if (url.origin !== self.location.origin) return false;
+async function cacheResponse(request, response) {
+  if (!isCacheableResponse(response)) return response;
+  const cache = await caches.open(CACHE_NAME);
+  cache.put(request, response.clone());
+  return response;
+}
 
-  const relativePath = url.pathname.startsWith(scopeUrl.pathname)
-    ? url.pathname.slice(scopeUrl.pathname.length)
-    : url.pathname;
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
 
-  return (
-    url.pathname === scopeUrl.pathname ||
-    relativePath === "" ||
-    relativePath === "index.html" ||
-    relativePath === "styles.css" ||
-    relativePath === "app.js" ||
-    relativePath === "manifest.webmanifest" ||
-    relativePath === "icon.svg" ||
-    relativePath === "service-worker.js"
-  );
+  const networkResponse = await fetch(request);
+  return cacheResponse(request, networkResponse);
+}
+
+async function networkFirst(request, preloadResponsePromise) {
+  try {
+    const preloadResponse = await preloadResponsePromise;
+    if (preloadResponse) {
+      return cacheResponse(request, preloadResponse);
+    }
+
+    const networkResponse = await fetch(request);
+    return cacheResponse(request, networkResponse);
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
+    const offlineDocument = await caches.match(OFFLINE_DOCUMENT_URL);
+    if (offlineDocument) return offlineDocument;
+
+    throw error;
+  }
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(APP_SHELL_URLS.map((url) => new Request(url, { cache: "reload" })));
+    })(),
+  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
-    ),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+
+      if ("navigationPreload" in self.registration) {
+        await self.registration.navigationPreload.enable().catch(() => {});
+      }
+
+      await self.clients.claim();
+    })(),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
-  if (event.request.mode === "navigate" || isAppShellRequest(event.request.url)) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          }
-          return response;
-        })
-        .catch(() =>
-          caches.match(event.request).then((cached) => cached || caches.match("./index.html")),
-        ),
-    );
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  if (event.request.mode === "navigate" || event.request.destination === "document") {
+    event.respondWith(networkFirst(event.request, event.preloadResponse));
+    return;
+  }
+
+  if (APP_SHELL_URL_SET.has(event.request.url)) {
+    event.respondWith(cacheFirst(event.request));
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-
-      return fetch(event.request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response;
-          }
-
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          return response;
-        })
-        .catch(() => caches.match("./index.html"));
+      return fetch(event.request).then((response) => cacheResponse(event.request, response));
     }),
   );
 });

@@ -57,6 +57,14 @@ const LAB_DEFINITIONS = {
     4: "> 20.0 x ULN",
     5: "死亡。",
   },
+  ggt: {
+    0: "正常／評価対象外",
+    1: "> ULN 〜 2.5 x ULN",
+    2: "> 2.5 〜 5.0 x ULN",
+    3: "> 5.0 〜 20.0 x ULN",
+    4: "> 20.0 x ULN",
+    5: "死亡。",
+  },
   tbil: {
     0: "正常／評価対象外",
     1: "> ULN 〜 1.5 x ULN",
@@ -147,12 +155,15 @@ const LAB_REF_MODES = {
   ast: "high",
   alt: "high",
   alp: "high",
+  ggt: "high",
   tbil: "high",
   cr: "high",
+  egfr: "low",
   na: "both",
   k: "both",
   ca: "both",
   mg: "both",
+  ldh: "high",
   "uric-acid": "high",
   phosphate: "both",
 };
@@ -171,12 +182,15 @@ const DEFAULT_LAB_REFS = {
   ast: { low: "13", high: "30" },
   alt: { low: "7", high: "42" },
   alp: { low: "106", high: "322" },
+  ggt: { low: "9", high: "32" },
   tbil: { low: "0.4", high: "1.5" },
   cr: { low: "0.46", high: "1.07" },
+  egfr: { low: "60", high: "" },
   na: { low: "138", high: "145" },
   k: { low: "3.6", high: "4.8" },
   ca: { low: "8.8", high: "10.1" },
   mg: { low: "1.8", high: "2.4" },
+  ldh: { low: "124", high: "222" },
   "uric-acid": { low: "2.6", high: "7.8" },
   phosphate: { low: "2.7", high: "4.6" },
 };
@@ -229,7 +243,8 @@ function getLabGrade(labId, value, low, high) {
       if (ratio > 1) return 1;
       return 0;
     }
-    case "alp": {
+    case "alp":
+    case "ggt": {
       const ratio = uln > 0 ? numericValue / uln : 0;
       if (ratio > 20) return 4;
       if (ratio > 5) return 3;
@@ -250,6 +265,20 @@ function getLabGrade(labId, value, low, high) {
       if (ratio > 6) return 4;
       if (ratio > 3) return 3;
       if (ratio > 1.5) return 2;
+      if (ratio > 1) return 1;
+      return 0;
+    }
+    case "egfr":
+      if (numericValue < 15) return 4;
+      if (numericValue < 30) return 3;
+      if (numericValue < 60) return 2;
+      if (numericValue < lln) return 1;
+      return 0;
+    case "ldh": {
+      const ratio = uln > 0 ? numericValue / uln : 0;
+      if (ratio > 10) return 4;
+      if (ratio > 5) return 3;
+      if (ratio > 2.5) return 2;
       if (ratio > 1) return 1;
       return 0;
     }
@@ -929,6 +958,102 @@ const REGIMENS = {
       { id: "phosphate", label: "高リン血症 / 低リン血症", shortLabel: "P", unit: "mg/dL", grades: LAB_DEFINITIONS.phosphate },
     ],
   },
+  buTtLymphomaAsct: {
+    id: "buTtLymphomaAsct",
+    name: "BuTT（悪性リンパ腫・自家移植）",
+    subtitle: "Bu 0.8 mg/kg q6h または 3.2 mg/kg q24h ×4日 + TT 5 mg/kg q24h ×2日（国内承認用量）",
+    dayHints: [
+      { min: -8, max: -5, text: "Bu投与中：悪心 / 嘔吐、意識変容・振戦・痙攣、肝機能、体重、尿量、Na / K / Ca / Mg / 血糖を確認。イトラコナゾール、メトロニダゾール、デフェラシロクスなど相互作用薬も再確認する。" },
+      { min: -4, max: -3, text: "TT投与中：悪心、口腔・咽頭症状、下痢、発疹を確認。初回投与3〜4時間後から最終投与48時間後まで、施設手順に沿った皮膚洗浄・衣類 / 寝具交換を行う。" },
+      { min: -2, max: 0, text: "移植直前〜day 0：粘膜障害、消化器症状、皮膚障害、肝機能、体重・尿量・入出量、電解質を確認する。" },
+      { min: 1, max: 14, text: "day 1-14 は高度血球減少、発熱性好中球減少症 / 感染症、出血、口腔粘膜炎、嚥下痛、下痢、食欲低下を最優先で確認。国内試験の好中球生着中央値は day +11。" },
+      { min: 15, max: 42, text: "day 15-42 はSOS / VODを除外し続ける。発症中央値 day +30の報告があり、体重・腹囲、右季肋部痛、Bil、血小板輸血反応、腎・呼吸状態を確認。一度生着した血小板の再低下（SFPR、報告中央値 day +38）にも注意する。" },
+      { min: 43, max: 60, text: "day 43-60 は血小板再低下、遷延する皮膚色素沈着、感染症、肺・腎障害を確認。再発、感染、薬剤性、TMAなど血小板減少の他原因を評価する。" },
+    ],
+    adverseSections: [
+      {
+        title: "重篤な副作用",
+        tone: "danger",
+        items: [
+          { title: "発熱性好中球減少症 / 重度感染症", marker: "最優先", note: "国内 expanded-access study では発熱性好中球減少症が 96.1%。深い骨髄抑制下の発熱、悪寒、咳、局所感染徴候を最優先で評価する。" },
+          { title: "高度血球減少 / 出血", marker: "要介入", note: "全例で骨髄抑制が確認された移植前処置。ANC、Hb、Plt と出血症状を継続して確認する。" },
+          { title: "肝類洞閉塞症候群 / SOS-VOD", marker: "day +30注意", note: "国内51例で2例。別の悪性リンパ腫自家移植132例では10例（7.6%）、発症中央値day +30で、9/10例はday +20後に診断された。体重・腹囲増加、肝腫大 / 圧痛、腹水、Bil上昇、血小板輸血不応を確認する。" },
+          { title: "痙攣 / 脳症", marker: "ブスルファン", note: "ブスルファンは髄液移行性が高く痙攣を起こしうる。予防投薬下でも意識変容、けいれん、異常行動を見逃さない。" },
+          { title: "肺障害 / 呼吸不全", marker: "見逃し注意", note: "肺胞出血、ARDS、間質性肺炎、呼吸不全が公的ラベルに記載される。呼吸苦、低酸素、咳、喀血を確認する。" },
+          { title: "心筋症 / 心機能障害", marker: "見逃し注意", note: "ブスルファンの公的ラベルで重大な副作用。息切れ、浮腫、動悸、体重増加など新規の心不全症状を確認する。" },
+          { title: "ショック / アナフィラキシー", marker: "投与近接", note: "国内試験の過敏症は 19.6%。低血圧、呼吸苦、蕁麻疹など投与近接の全身反応を見逃さない。" },
+          { title: "腎機能障害", marker: "見逃し注意", note: "チオテパの公的ラベルで急性腎障害を含む腎機能障害が重大な副作用。Cr、尿量、体液量を確認する。" },
+          { title: "血栓性微小血管症", marker: "見逃し注意", note: "チオテパの公的ラベルで重大な副作用。Hb / Plt低下、LDH上昇、腎機能悪化など複数所見の組合せに注意する。" },
+        ],
+      },
+      {
+        title: "頻度の高い副作用",
+        tone: "warn",
+        items: [
+          { title: "発熱性好中球減少症", marker: "TEAE 96.1%", note: "国内 expanded-access study の治療中有害事象（TEAE）で全例 grade 3。薬剤との因果関係が確定した副作用頻度ではない。感染源検索と迅速な初期対応を前提に評価する。" },
+          { title: "下痢", marker: "TEAE 82.4%", note: "grade 3-4は11.8%。回数、失禁、血便、脱水、電解質異常を確認する。" },
+          { title: "口内炎 / 口腔粘膜炎", marker: "TEAE 62.7%", note: "grade 3-4は25.5%。疼痛、潰瘍、嚥下痛、経口摂取低下を確認する。" },
+          { title: "悪心 / 嘔吐", marker: "TEAE 56.9% / 29.4%", note: "grade 3-4は悪心7.8%、嘔吐2.0%。制吐状況、摂取量、補液の必要性を評価する。" },
+          { title: "食欲不振", marker: "TEAE 54.9%", note: "grade 3-4は31.4%。体重減少、脱水、栄養介入の必要性を確認する。" },
+          { title: "倦怠感", marker: "47.1%", note: "感染、貧血、脱水、臓器障害が背景にないかを併せて確認する。" },
+          { title: "肝機能異常", marker: "33.3%", note: "AST / ALT / Bil の推移を確認し、VOD / SOS の症候を伴わないか評価する。" },
+        ],
+      },
+      {
+        title: "特徴的な副作用",
+        tone: "info",
+        items: [
+          { title: "痙攣リスクと予防投薬", marker: "Buらしさ", note: "ブスルファン投与前から抗痙攣薬の使用を考慮することが公的ラベルで明記される。" },
+          { title: "SOS / VODはday +21以降も除外しない", marker: "BuTTらしさ", note: "132例解析ではBuTTと移植前フェリチン950 ng/mL以上が独立したリスク因子。国内試験の2例だけでなく遅発例を意識する。" },
+          { title: "浮腫 / 体液貯留", marker: "TT注意", note: "チオテパの公的ラベルで肺水腫、浮腫、胸水、心嚢液貯留が重大な副作用。体重、呼吸状態、尿量を確認する。" },
+          { title: "チオテパ皮膚毒性", marker: "汗中排泄", note: "国内試験で接触性皮膚炎17.6%、発疹13.7%。皮膚皺・閉塞部を重点確認する。eviQでは初回投与3〜4時間後から最終投与48時間後まで、1日2回以上と発汗時の水洗浄、衣類・寝具の毎日交換を推奨する。" },
+          { title: "生着後の血小板再低下 / SFPR", marker: "day +38注意", note: "BuTT 24例中3例で、一度の血小板生着後に他系統を保ちながら再低下し、発症中央値はday +38。因果関係は確定していないため、再発、感染、薬剤性、TMAなどを除外する。" },
+          { title: "ブスルファンの薬物相互作用", marker: "投与前確認", note: "イトラコナゾール、メトロニダゾール、デフェラシロクスはブスルファン曝露量を増加させる可能性があり、Bu開始前に併用薬を確認する。" },
+          { title: "味覚異常", marker: "37.3%", note: "摂取低下を増悪させうるため、食欲不振や粘膜炎と分けて確認する。" },
+        ],
+      },
+    ],
+    symptoms: [
+      { id: "febrile-neutropenia", name: "発熱性好中球減少症", tag: "重篤", checklist: "発熱、ANC低下、悪寒、血圧低下、呼吸器症状、局所感染徴候", grades: { 1: "-", 2: "慎重な評価を要する。", 3: "速やかな医学的評価または治療介入を要する。", 4: "生命を脅かす感染症や血行動態不安定を伴い、緊急対応を要する。", 5: "死亡。" } },
+      { id: "infection", name: "感染症", tag: "重篤", checklist: "発熱、悪寒、咳、呼吸苦、咽頭痛、局所疼痛 / 発赤、血圧低下", grades: { 1: "軽度。局所症状のみ。", 2: "局所治療または内服治療を要する。", 3: "静注治療、侵襲的処置、または入院を要する。", 4: "生命を脅かす感染症。緊急対応を要する。", 5: "死亡。" } },
+      { id: "infusion-reaction", name: "輸注関連反応 / 過敏症", tag: "重篤", checklist: "発熱、悪寒、発疹、蕁麻疹、呼吸苦、低酸素、血圧低下", grades: { 1: "軽度。", 2: "治療または投与中断を要し、速やかに改善する。", 3: "遷延 / 再発する高度症状で、入院または明確な医学的介入を要する。", 4: "生命を脅かす。緊急対応を要する。", 5: "死亡。" } },
+      { id: "fever", name: "発熱", tag: "頻用", grades: { 1: "38.0 ℃以上 39.0 ℃未満。", 2: "39.0 ℃以上 40.0 ℃未満。", 3: "40.0 ℃以上 > 24 時間、または入院相当の評価・介入を要する。", 4: "生命を脅かす全身状態悪化を伴う。", 5: "死亡。" } },
+      { id: "bleeding", name: "出血", tag: "重篤", checklist: "皮下出血、歯肉出血、鼻出血、血尿、黒色便 / 下血、Hb低下、血小板減少", grades: { 1: "軽度。", 2: "局所処置 / 軽度介入を要する。", 3: "輸血、処置、または入院を要する。", 4: "生命を脅かす出血。", 5: "死亡。" } },
+      { id: "seizure", name: "痙攣 / 脳症", tag: "重篤", checklist: "けいれん、意識変容、異常行動、失見当識、譫妄、傾眠、頭痛", grades: { 1: "軽度の神経症状。", 2: "中等度で医学的評価または治療を要する。", 3: "高度の症状、けいれん、または入院管理を要する。", 4: "遷延するけいれん、昏睡など生命を脅かす。", 5: "死亡。" } },
+      { id: "dyspnea", name: "呼吸困難", tag: "重篤", checklist: "SpO2低下、頻呼吸、起坐呼吸、咳、喀血、胸部異常所見、画像異常", grades: { 1: "強い運動時のみ。", 2: "軽い労作で出現する。", 3: "安静時に出現する / ADL に支障をきたす。", 4: "生命を脅かす。緊急対応を要する。", 5: "死亡。" } },
+      { id: "cardiac-disorders", name: "心機能低下 / 心不全症状", tag: "重篤", checklist: "息切れ、起坐呼吸、浮腫、体重増加、動悸、LVEF低下、胸部異常所見", grades: { 1: "無症候。検査異常のみ。", 2: "症候または内服治療を要する。", 3: "高度の症候または入院を要する。", 4: "生命を脅かす心不全。緊急対応を要する。", 5: "死亡。" } },
+      { id: "edema", name: "浮腫 / 体液貯留", tag: "重篤", checklist: "体重増加、末梢浮腫、尿量低下、胸水、心嚢液、呼吸苦、腹水", grades: { 1: "軽度の浮腫または体重増加。", 2: "中等度で利尿薬などの治療を要する。", 3: "高度でADL制限、酸素投与、または入院管理を要する。", 4: "肺水腫や循環不全など生命を脅かす。", 5: "死亡。" } },
+      { id: "vod-sos", name: "SOS / VOD疑い", tag: "重篤", checklist: "急速な体重増加、腹囲増大、腹水、右季肋部痛、肝腫大、Bil上昇、血小板輸血不応、腎 / 呼吸状態悪化", grades: { 1: "軽度の症候または検査異常があり、継続評価を要する。", 2: "中等度の症候があり、医学的介入を要する。", 3: "高度の症候または臓器障害があり、入院下の治療を要する。", 4: "多臓器不全など生命を脅かす。緊急対応を要する。", 5: "死亡。" } },
+      { id: "nausea", name: "悪心", tag: "頻用", grades: { 1: "食欲低下を伴うが、食事量低下は軽度。", 2: "経口摂取量が明らかに低下する。", 3: "カロリー / 水分補給に医療的介入を要する。", 4: "-", 5: "死亡。" } },
+      { id: "vomiting", name: "嘔吐", tag: "頻用", grades: { 1: "24 時間に 1 〜 2 回。", 2: "24 時間に 3 〜 5 回。", 3: "24 時間に 6 回以上、または点滴 / TPN / 入院を要する。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "diarrhea", name: "下痢", tag: "頻用", grades: { 1: "ベースラインより < 4 回/日の増加。", 2: "ベースラインより 4 〜 6 回/日の増加。", 3: "ベースラインより >= 7 回/日の増加、失禁、入院、高度脱水。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "mucositis", name: "口腔粘膜炎 / 嚥下痛", tag: "頻用", checklist: "口腔内発赤、潰瘍、疼痛、咽頭痛、嚥下痛、経口摂取低下", grades: { 1: "無症候または軽度。", 2: "中等度の疼痛があるが、経口摂取は可能。", 3: "高度の疼痛があり、経口摂取に支障をきたす。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "appetite", name: "食欲不振", tag: "頻用", grades: { 1: "食習慣の変化を伴わない食欲低下。", 2: "経口摂取量の変化を伴うが、著明な体重減少はない。経口栄養補助を要することがある。", 3: "著明な体重減少または栄養不良を伴う。経管栄養 / TPNを要する。", 4: "-", 5: "死亡。" } },
+      { id: "fatigue", name: "疲労 / 倦怠感", tag: "頻用", grades: { 1: "軽度。", 2: "中等度。ADLが制限される。", 3: "高度。self care ADL が制限される。", 4: "-", 5: "死亡。" } },
+      { id: "rash", name: "発疹 / 皮膚障害", tag: "特徴的", checklist: "紅斑、発疹、乾燥、疼痛、そう痒、剥離、水疱", grades: { 1: "限局性または軽度。", 2: "範囲が広がる / 症候を伴い局所治療を要する。", 3: "広範囲で ADL に影響し、全身治療を要する。", 4: "生命を脅かす重度皮膚障害。", 5: "死亡。" } },
+      { id: "dysgeusia", name: "味覚異常", tag: "特徴的", grades: { 1: "味覚変化があるが食事摂取への影響は軽度。", 2: "食事摂取に影響し、栄養調整を要する。", 3: "高度の摂取障害があり、経管栄養 / TPN等を要する。", 4: "-", 5: "死亡。" } },
+      { id: "secondary-platelet-failure", name: "生着後の血小板再低下", tag: "特徴的", checklist: "一度回復したPltの再低下、他系統の血球推移、出血、輸血反応、感染、再発、薬剤、TMA所見", grades: { 1: "軽度の再低下。経過観察と原因評価を要する。", 2: "明確な再低下があり、追加検査または支持療法を要する。", 3: "輸血などの医学的介入または入院管理を要する。", 4: "生命を脅かす出血または重篤な合併症を伴う。", 5: "死亡。" } },
+    ],
+    labs: [
+      { id: "wbc", label: "白血球数減少", shortLabel: "WBC", unit: "/μL", grades: LAB_DEFINITIONS.wbc },
+      { id: "anc", label: "好中球数減少", shortLabel: "ANC", unit: "/μL", grades: LAB_DEFINITIONS.anc },
+      { id: "hb", label: "貧血", shortLabel: "Hb", unit: "g/dL", grades: LAB_DEFINITIONS.hb },
+      { id: "plt", label: "血小板数減少", shortLabel: "Plt", unit: "×10^4/μL", grades: LAB_DEFINITIONS.plt },
+      { id: "ast", label: "AST増加", shortLabel: "AST", unit: "U/L", grades: LAB_DEFINITIONS.ast },
+      { id: "alt", label: "ALT増加", shortLabel: "ALT", unit: "U/L", grades: LAB_DEFINITIONS.alt },
+      { id: "alp", label: "ALP増加", shortLabel: "ALP", unit: "U/L", grades: LAB_DEFINITIONS.alp },
+      { id: "ggt", label: "γ-GTP増加", shortLabel: "γ-GTP", unit: "U/L", grades: LAB_DEFINITIONS.ggt },
+      { id: "tbil", label: "血中ビリルビン増加", shortLabel: "T-Bil", unit: "mg/dL", grades: LAB_DEFINITIONS.tbil },
+      { id: "cr", label: "血中クレアチニン増加", shortLabel: "Cr", unit: "mg/dL", grades: LAB_DEFINITIONS.cr },
+      { id: "egfr", label: "eGFR低下", shortLabel: "eGFR", unit: "mL/min/1.73m²", grades: LAB_DEFINITIONS.egfr },
+      { id: "na", label: "低ナトリウム血症 / 高ナトリウム血症", shortLabel: "Na", unit: "mmol/L", grades: LAB_DEFINITIONS.na },
+      { id: "k", label: "低カリウム血症 / 高カリウム血症", shortLabel: "K", unit: "mmol/L", grades: LAB_DEFINITIONS.k },
+      { id: "ca", label: "低カルシウム血症 / 高カルシウム血症", shortLabel: "Ca", unit: "mg/dL", grades: LAB_DEFINITIONS.ca },
+      { id: "mg", label: "低マグネシウム血症 / 高マグネシウム血症", shortLabel: "Mg", unit: "mg/dL", grades: LAB_DEFINITIONS.mg },
+      { id: "ldh", label: "LDH増加", shortLabel: "LDH", unit: "U/L", grades: LAB_DEFINITIONS.ldh },
+      { id: "phosphate", label: "高リン血症 / 低リン血症", shortLabel: "P", unit: "mg/dL", grades: LAB_DEFINITIONS.phosphate },
+    ],
+  },
   mel200MmAsct: {
     id: "mel200MmAsct",
     name: "MEL200（MM自家移植）",
@@ -1086,6 +1211,81 @@ const REGIMENS = {
       { id: "phosphate", label: "高リン血症 / 低リン血症", shortLabel: "P", unit: "mg/dL", grades: LAB_DEFINITIONS.phosphate },
     ],
   },
+  cyTbiAtgTacMtxAlloPbsct: {
+    id: "cyTbiAtgTacMtxAlloPbsct",
+    name: "Cy/TBI・ATG/TAC/MTX（同種PBSCT）",
+    subtitle: "Cyclophosphamide + total body irradiation conditioning with ATG / tacrolimus / methotrexate prophylaxis",
+    dayHints: [
+      { min: 1, max: 3, text: "day 1-3 は ATG輸注関連反応、発熱 / 悪寒、悪心 / 嘔吐、呼吸苦、尿量低下や Na / K / Mg 変動の有無を優先して確認。" },
+      { min: 4, max: 7, text: "day 4-7 は口腔粘膜炎、下痢、血尿 / 排尿時痛、AST / ALT / Bil / Cr 上昇、高血圧、振戦を意識して確認。" },
+      { min: 8, max: 14, text: "day 8-14 は好中球減少、発熱性好中球減少症、感染症、血小板減少 / 出血を最優先で確認。Cy/TBI 文献では SOS 発現中央値が day 12 のため肝障害も見逃さない。" },
+      { min: 15, max: 28, text: "後半は血球回復遅延、感染症遷延、CMV / EBV再活性化監視、tacrolimus 腎障害 / 神経毒性 / TMA徴候、持続する肝障害を確認。" },
+    ],
+    adverseSections: [
+      {
+        title: "重篤な副作用",
+        tone: "danger",
+        items: [
+          { title: "発熱性好中球減少症 / 重度感染症", marker: "最優先", note: "conditioning と強い免疫抑制が重なる。発熱、悪寒、咳、呼吸苦、局所症状は早めに拾う。" },
+          { title: "ATG輸注関連反応 / アナフィラキシー", marker: "投与近接", note: "Thymoglobulin では infusion reaction、anaphylaxis、cytokine release が警告される。" },
+          { title: "腎障害 / tacrolimus腎毒性", marker: "要介入", note: "Cr 上昇、K上昇、Mg低下、尿量低下があれば早期対応が必要。" },
+          { title: "高度血小板減少 / 出血", marker: "要介入", note: "血小板減少と血尿・消化管出血を伴うと重症化しうる。" },
+          { title: "肝障害 / VOD-SOS", marker: "day 12注意", note: "Cy/TBI 論文では SOS 発現中央値が day 12。Bil 上昇、体重増加、右季肋部痛、肝腫大に注意。" },
+          { title: "TMA / HUS / TTP", marker: "見逃し注意", note: "tacrolimus で報告。Hb低下、Plt低下、Cr上昇、神経症状が重なれば疑う。" },
+        ],
+      },
+      {
+        title: "頻度の高い副作用",
+        tone: "warn",
+        items: [
+          { title: "白血球 / 好中球減少", marker: "移植期中心毒性", note: "感染症トリガーとして最重要。血球回復遅延も意識する。" },
+          { title: "発熱 / 悪寒", marker: "ATG・感染", note: "ATG infusion と感染症の両方の起点になる。" },
+          { title: "悪心 / 嘔吐", marker: "早期症候", note: "cyclophosphamide と ATG で起こりうる。脱水や内服困難につながる。" },
+          { title: "下痢", marker: "症候確認", note: "methotrexate を含む GI toxicity。脱水や電解質異常に注意。" },
+          { title: "口腔粘膜炎", marker: "MTX注意", note: "methotrexate label で一貫して重要。摂食低下や感染リスクに影響する。" },
+          { title: "高血圧 / 振戦", marker: "tacrolimus", note: "tacrolimus の common toxicity。腎障害や神経毒性の前景でないか併せてみる。" },
+        ],
+      },
+      {
+        title: "特徴的な副作用",
+        tone: "info",
+        items: [
+          { title: "血尿 / 出血性膀胱炎", marker: "cyclophosphamideらしさ", note: "肉眼的血尿、排尿時痛、頻尿、残尿感があれば見逃さない。" },
+          { title: "tacrolimus神経毒性 / PRES疑い", marker: "見逃し注意", note: "振戦に加えて頭痛、視覚異常、錯乱、けいれんがあれば重症神経毒性を疑う。" },
+          { title: "CMV / EBV再活性化", marker: "ATG後", note: "ATG trial では EBV 再活性化が問題になっており、感染症監視とは別に意識する。" },
+          { title: "SOS は早期 2週前後が要注意", marker: "Cy/TBI文脈", note: "Cy/TBI 論文で SOS 発現中央値は day 12。肝障害は後回しにしない。" },
+        ],
+      },
+    ],
+    symptoms: [
+      { id: "febrile-neutropenia", name: "発熱性好中球減少症", tag: "重篤", checklist: "発熱、ANC低下、悪寒、血圧低下、呼吸器症状、局所感染徴候", grades: { 1: "-", 2: "慎重な評価を要する。", 3: "速やかな医学的評価または治療介入を要する。", 4: "生命を脅かす感染症や血行動態不安定を伴い、緊急対応を要する。", 5: "死亡。" } },
+      { id: "infusion-reaction", name: "輸注関連反応", tag: "重篤", checklist: "発熱、悪寒、発疹、血圧低下、呼吸苦、SpO2低下、胸部不快", grades: { 1: "軽度。", 2: "治療または投与中断を要する。速やかに改善しうる。", 3: "遷延または再発しうる高度の症状で、入院または明確な医学的介入を要する。", 4: "生命を脅かす。緊急対応を要する。", 5: "死亡。" } },
+      { id: "infection", name: "感染症", tag: "重篤", checklist: "発熱、悪寒、咳、呼吸苦、咽頭痛、局所疼痛 / 発赤、血圧低下", grades: { 1: "軽度。局所症状のみ。", 2: "局所治療または内服治療を要する。", 3: "静注治療、侵襲的処置、または入院を要する。", 4: "生命を脅かす感染症。緊急対応を要する。", 5: "死亡。" } },
+      { id: "dyspnea", name: "呼吸困難", tag: "重篤", checklist: "SpO2低下、頻呼吸、起坐呼吸、会話困難、胸部異常所見、画像異常", grades: { 1: "強い運動時のみ。", 2: "軽い労作で出現する。", 3: "安静時に出現する / ADL に支障をきたす。", 4: "生命を脅かす。緊急対応を要する。", 5: "死亡。" } },
+      { id: "bleeding", name: "出血", tag: "重篤", checklist: "皮下出血、歯肉出血、鼻出血、血尿、黒色便 / 下血、Hb低下、血小板減少", grades: { 1: "軽度。", 2: "局所処置 / 軽度介入を要する。", 3: "輸血、処置、または入院を要する。", 4: "生命を脅かす出血。", 5: "死亡。" } },
+      { id: "fever", name: "発熱", tag: "頻用", grades: { 1: "38.0 ℃以上 39.0 ℃未満。", 2: "39.0 ℃以上 40.0 ℃未満。", 3: "40.0 ℃以上 > 24 時間、または入院相当の評価・介入を要する。", 4: "生命を脅かす全身状態悪化を伴う。", 5: "死亡。" } },
+      { id: "nausea", name: "悪心", tag: "頻用", grades: { 1: "食欲低下を伴うが、食事量低下は軽度。", 2: "経口摂取量が明らかに低下する。", 3: "カロリー / 水分補給に医療的介入を要する。", 4: "-", 5: "死亡。" } },
+      { id: "vomiting", name: "嘔吐", tag: "頻用", grades: { 1: "24 時間に 1 〜 2 回。", 2: "24 時間に 3 〜 5 回。", 3: "24 時間に 6 回以上、または点滴 / TPN / 入院を要する。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "diarrhea", name: "下痢", tag: "頻用", grades: { 1: "ベースラインより < 4 回/日の増加。", 2: "ベースラインより 4 〜 6 回/日の増加。", 3: "ベースラインより >= 7 回/日の増加、失禁、入院、高度脱水。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "mucositis", name: "口腔粘膜炎", tag: "特徴的", grades: { 1: "無症候または軽度。", 2: "中等度の疼痛があるが、経口摂取は可能。", 3: "高度の疼痛があり、経口摂取に支障をきたす。", 4: "生命を脅かす。", 5: "死亡。" } },
+      { id: "hematuria", name: "血尿 / 出血性膀胱炎", tag: "特徴的", checklist: "肉眼的血尿、排尿時痛、頻尿、残尿感、尿混濁、血塊、Hb低下", grades: { 1: "顕微鏡的血尿または軽度症状。", 2: "肉眼的血尿または中等度症状。内服や局所対応を要する。", 3: "持続する血尿、血塊、膀胱洗浄、入院または明確な医学的介入を要する。", 4: "生命を脅かす出血または尿路閉塞。緊急対応を要する。", 5: "死亡。" } },
+      { id: "tremor", name: "振戦", tag: "特徴的", checklist: "手指振戦、頭痛、視覚異常、錯乱、傾眠、けいれん、血圧上昇", grades: { 1: "軽度。日常生活への影響は乏しい。", 2: "中等度。手段的 ADL に支障をきたす。", 3: "高度。self care ADL に支障をきたす、または明確な医学的介入を要する。", 4: "生命を脅かす神経学的悪化を伴う。", 5: "死亡。" } },
+      { id: "hypertension", name: "高血圧", tag: "特徴的", grades: { 1: "収縮期 120 〜 139 mmHg または拡張期 80 〜 89 mmHg 相当。", 2: "反復する高血圧で内服調整を要する。", 3: "複数薬剤調整またはより強い医学的介入を要する。", 4: "生命を脅かす高血圧緊急症。", 5: "死亡。" } },
+    ],
+    labs: [
+      { id: "wbc", label: "白血球数減少", shortLabel: "WBC", unit: "/μL", grades: LAB_DEFINITIONS.wbc },
+      { id: "anc", label: "好中球数減少", shortLabel: "ANC", unit: "/μL", grades: LAB_DEFINITIONS.anc },
+      { id: "hb", label: "貧血", shortLabel: "Hb", unit: "g/dL", grades: LAB_DEFINITIONS.hb },
+      { id: "plt", label: "血小板数減少", shortLabel: "Plt", unit: "×10^4/μL", grades: LAB_DEFINITIONS.plt },
+      { id: "ast", label: "AST増加", shortLabel: "AST", unit: "U/L", grades: LAB_DEFINITIONS.ast },
+      { id: "alt", label: "ALT増加", shortLabel: "ALT", unit: "U/L", grades: LAB_DEFINITIONS.alt },
+      { id: "tbil", label: "血中ビリルビン増加", shortLabel: "T-Bil", unit: "mg/dL", grades: LAB_DEFINITIONS.tbil },
+      { id: "cr", label: "血中クレアチニン増加", shortLabel: "Cr", unit: "mg/dL", grades: LAB_DEFINITIONS.cr },
+      { id: "na", label: "低ナトリウム血症 / 高ナトリウム血症", shortLabel: "Na", unit: "mmol/L", grades: LAB_DEFINITIONS.na },
+      { id: "k", label: "低カリウム血症 / 高カリウム血症", shortLabel: "K", unit: "mmol/L", grades: LAB_DEFINITIONS.k },
+      { id: "mg", label: "低マグネシウム血症 / 高マグネシウム血症", shortLabel: "Mg", unit: "mg/dL", grades: LAB_DEFINITIONS.mg },
+    ],
+  },
 };
 
 const state = {
@@ -1098,6 +1298,9 @@ const state = {
   labRefLow: {},
   labRefHigh: {},
 };
+
+const OFFLINE_CACHE_NAME = "regimen-ae-app-v8";
+const OFFLINE_REQUIRED_PATHS = ["./index.html", "./styles.css", "./app.js"];
 
 let offlineCacheReady = false;
 
@@ -1138,11 +1341,34 @@ function persistState() {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
 }
 
+function clearOfflineStatus() {
+  if (!elements.offlineStatus) return;
+  elements.offlineStatus.textContent = "";
+  delete elements.offlineStatus.dataset.tone;
+  elements.offlineStatus.hidden = true;
+}
+
 function setOfflineStatus(message, tone = "neutral") {
   if (!elements.offlineStatus) return;
   const connection = navigator.onLine ? "現在オンラインです。" : "現在オフラインです。";
+  elements.offlineStatus.hidden = false;
   elements.offlineStatus.textContent = `${message} ${connection}`;
   elements.offlineStatus.dataset.tone = tone;
+}
+
+async function hasRequiredOfflineShell() {
+  if (!("caches" in window)) return false;
+
+  try {
+    const cache = await caches.open(OFFLINE_CACHE_NAME);
+    const matches = await Promise.all(
+      OFFLINE_REQUIRED_PATHS.map((path) => cache.match(new URL(path, window.location.href).toString())),
+    );
+    return matches.every(Boolean);
+  } catch (error) {
+    console.warn("offline cache verification failed", error);
+    return false;
+  }
 }
 
 function bindEvents() {
@@ -1222,12 +1448,14 @@ function updateContext() {
   const cycle = state.cycle || "未入力";
   const day = state.day || "未入力";
   elements.contextSummary.textContent = `${regimen.name} / ${disease} / cycle ${cycle} / day ${day}`;
-  elements.timingHint.textContent = findTimingHint(regimen, Number(state.day));
+  elements.timingHint.textContent = findTimingHint(regimen, state.day);
 }
 
 function findTimingHint(regimen, day) {
-  if (!day) return "dayを入れると、発現時期の参考メモがここに出ます。";
-  const match = regimen.dayHints.find((hint) => day >= hint.min && day <= hint.max);
+  if (day === "" || day === null || day === undefined) return "dayを入れると、発現時期の参考メモがここに出ます。";
+  const numericDay = Number(day);
+  if (!Number.isFinite(numericDay)) return "dayを入れると、発現時期の参考メモがここに出ます。";
+  const match = regimen.dayHints.find((hint) => numericDay >= hint.min && numericDay <= hint.max);
   return match ? match.text : "このdayに対する個別メモは未設定です。骨髄抑制、感染、出血傾向を中心に確認。";
 }
 
@@ -1498,7 +1726,9 @@ function registerServiceWorker() {
       setOfflineStatus("この端末に保存済みです。オンライン中は最新ファイルを確認できます。", "ready");
       return;
     }
-    setOfflineStatus("この端末に保存する準備をしています。初回はオンラインで最後まで表示してください。");
+    setOfflineStatus(
+      "この端末に保存する準備をしています。初回は同じURLをオンラインで最後まで表示したまま数秒待ってください。",
+    );
   };
 
   const handleOffline = () => {
@@ -1515,10 +1745,7 @@ function registerServiceWorker() {
   }
 
   if (window.location.protocol === "file:") {
-    setOfflineStatus(
-      "ファイルを直接開いているためオフライン保存は有効になりません。Safari/ChromeでURLとして開いてください。",
-      "warn",
-    );
+    clearOfflineStatus();
     return;
   }
 
@@ -1527,28 +1754,48 @@ function registerServiceWorker() {
     return;
   }
 
+  const syncOfflineStatus = async (registration = null) => {
+    const hasOfflineShell = await hasRequiredOfflineShell();
+    const hasActiveWorker = Boolean(registration?.active || navigator.serviceWorker.controller);
+    offlineCacheReady = hasOfflineShell && hasActiveWorker;
+
+    if (navigator.onLine) {
+      handleOnline();
+      return;
+    }
+
+    handleOffline();
+  };
+
   window.addEventListener("online", () => {
-    handleOnline();
+    void syncOfflineStatus();
   });
   window.addEventListener("offline", () => {
-    handleOffline();
+    void syncOfflineStatus();
+  });
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    void syncOfflineStatus();
   });
 
-  offlineCacheReady = Boolean(navigator.serviceWorker.controller);
-  if (navigator.onLine) {
-    handleOnline();
-  } else {
-    handleOffline();
-  }
+  void syncOfflineStatus();
 
-  window.addEventListener("load", async () => {
+  (async () => {
     try {
-      await navigator.serviceWorker.register("./service-worker.js");
+      const registration = await navigator.serviceWorker.register("./service-worker.js");
       await navigator.serviceWorker.ready;
-      offlineCacheReady = true;
+      await syncOfflineStatus(registration);
+
+      if (offlineCacheReady) {
+        setOfflineStatus(
+          "この端末に保存できるよう準備しました。初回表示後はオフラインでも使えます。",
+          "ready",
+        );
+        return;
+      }
+
       setOfflineStatus(
-        "この端末に保存できるよう準備しました。初回表示後はオフラインでも使えます。",
-        "ready",
+        "保存準備は進んでいます。初回は同じURLをオンラインで開いたまま完了を待ってからオフラインで再度開いてください。",
+        "warn",
       );
     } catch (error) {
       console.warn("service worker registration failed", error);
@@ -1557,7 +1804,7 @@ function registerServiceWorker() {
         "danger",
       );
     }
-  });
+  })();
 }
 
 init();
